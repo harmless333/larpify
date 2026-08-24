@@ -1,0 +1,59 @@
+import socket
+import threading
+import json
+import time
+
+server = socket.socket()
+server.bind(("0.0.0.0", 5555))
+server.listen(2)
+
+players = []
+game = {"p1": 300, "p2": 300, "x": 450, "y": 300, "dx": 5, "dy": 5, "s1": 0, "s2": 0}
+
+def player(conn, num):
+    while True:
+        try:
+            data = json.loads(conn.recv(1024).decode())
+            game["p" + str(num)] = data["y"]
+        except:
+            break
+
+def send_game():
+    while True:
+        time.sleep(1 / 60)
+
+        game["x"] += game["dx"]
+        game["y"] += game["dy"]
+
+        if game["y"] <= 10 or game["y"] >= 590:
+            game["dy"] *= -1
+
+        if 30 < game["x"] < 50 and abs(game["y"] - game["p1"]) < 60:
+            game["dx"] = abs(game["dx"])
+
+        if 850 < game["x"] < 870 and abs(game["y"] - game["p2"]) < 60:
+            game["dx"] = -abs(game["dx"])
+
+        if game["x"] < 0:
+            game["s2"] += 1
+            game["x"], game["y"], game["dx"] = 450, 300, 5
+
+        if game["x"] > 900:
+            game["s1"] += 1
+            game["x"], game["y"], game["dx"] = 450, 300, -5
+
+        for p in players:
+            try:
+                p.send(json.dumps(game).encode())
+            except:
+                pass
+
+while len(players) < 2:
+    conn, addr = server.accept()
+    players.append(conn)
+    num = len(players)
+    conn.send(str(num).encode())
+    threading.Thread(target=player, args=(conn, num), daemon=True).start()
+    print("Spieler", num, "verbunden!")
+
+send_game()
